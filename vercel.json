@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/michlol.js": {
+      "maxDuration": 30
+    }
+  }
+}
