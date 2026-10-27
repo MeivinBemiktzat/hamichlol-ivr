@@ -42,8 +42,11 @@ package.json
 
 ```ini
 type=api
-api_link=https://YOUR-VERCEL-PROJECT.vercel.app/api/michlol
+api_link=https://hamichlol-ivr.vercel.app/api/michlol
 api_add_0=YemotAdvancedToken=YOUR_ADVANCED_YEMOT_TOKEN
+api_wait_answer_music_on_hold=yes
+api_wait_answer_music_on_hold_different=ztomao
+api_wait_answer_music_on_hold_continue_all_sends=yes
 ```
 
 יש להחליף את כתובת השרת ואת ערך הדוגמה בטוקן האישי. הקוד קורא את הערך מהבקשה שמגיעה מימות ומשתמש בו עבור `DownloadFile`.
