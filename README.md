@@ -18,7 +18,7 @@ lib/
   yemotFiles.js         - הורדת קובץ הקלטה דרך DownloadFile
   yemotSession.js      - שימוש בטוקן המתקדם שמוגדר בשלוחה
 ext.ini.example        - דוגמה להגדרת השלוחה בימות
-.env.example           - רשימת משתני הסביבה הנדרשים
+.env.example           - תיעוד: אין צורך במשתני סביבה
 vercel.json            - הגדרות Vercel (timeout לפונקציה)
 package.json
 ```
@@ -38,7 +38,15 @@ package.json
 
 אין צורך במשתני סביבה ב-Vercel: לא מספר מערכת, לא סיסמת מערכת, לא טוקן שרת ולא כתובת נפרדת לשירות התמלול.
 
-יש להגדיר את הטוקן המתקדם בהגדרות שלוחת `type=api` כפרמטר `YemotAdvancedToken`. דוגמה מופיעה בקובץ `ext.ini.example`. הקוד קורא את הערך מהבקשה שמגיעה מימות ומשתמש בו עבור `DownloadFile`.
+יש להגדיר את הטוקן המתקדם בהגדרות שלוחת `type=api` כפרמטר `YemotAdvancedToken`. דוגמת הגדרה:
+
+```ini
+type=api
+api_link=https://YOUR-VERCEL-PROJECT.vercel.app/api/michlol
+api_add_0=YemotAdvancedToken=YOUR_ADVANCED_YEMOT_TOKEN
+```
+
+יש להחליף את כתובת השרת ואת ערך הדוגמה בטוקן האישי. הקוד קורא את הערך מהבקשה שמגיעה מימות ומשתמש בו עבור `DownloadFile`.
 
 שירות התמלול נמצא באותו פרויקט, בכתובת `/api/transcribe`, ולכן אין צורך במשתנה `TRANSCRIBE_SERVICE_URL`.
 
