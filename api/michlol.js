@@ -59,7 +59,21 @@ async function transcribe(wavBytes, req) {
   }
 }
 
+function logStep(event, details = {}) {
+  console.log(JSON.stringify({ scope: 'hamichlol-ivr', event, at: new Date().toISOString(), ...details }));
+}
+
+function safeError(error) {
+  return {
+    name: error?.name || 'Error',
+    message: String(error?.message || error || 'unknown').slice(0, 500),
+    code: error?.code || undefined,
+    cause: error?.cause ? String(error.cause.message || error.cause).slice(0, 250) : undefined,
+  };
+}
+
 function send(res, body) {
+  logStep('response_sent', { status: 200, responseLength: String(body || '').length, responseType: String(body || '').split('=')[0] });
   res.statusCode = 200;
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.end(body);
@@ -70,6 +84,15 @@ function errorMessage(message) {
 }
 
 async function handler(req, res) {
+  const startedAt = Date.now();
+  const requestId = req.headers['x-vercel-id'] || req.headers['x-request-id'] || `ivr-${Date.now().toString(36)}`;
+  logStep('request_start', {
+    requestId,
+    method: req.method,
+    urlPath: String(req.url || '').split('?')[0],
+    contentType: req.headers['content-type'] || null,
+    vercelRegion: process.env.VERCEL_REGION || null,
+  });
   try {
     const body = await parseBody(req);
     req.body = body;
@@ -78,9 +101,19 @@ async function handler(req, res) {
     const recording = params.get(RECORDING_PARAM);
     const choice = params.get(CHOICE_PARAM);
     const yemotApiKey = params.get(TOKEN_PARAM) || process.env.YEMOT_API_KEY;
+    logStep('params_parsed', {
+      requestId,
+      parameterNames: [...params.keys()].filter((key) => key !== TOKEN_PARAM),
+      hasRecording: Boolean(recording),
+      recordingValue: recording ? String(recording).slice(0, 160) : null,
+      hasChoice: Boolean(choice),
+      choice: choice || null,
+      hasYemotApiKey: Boolean(yemotApiKey),
+    });
 
     // Step A: first request — ask the caller to record the search query.
     if (!recording) {
+      logStep('stage_record_prompt', { requestId });
       const recordSpec = `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`;
       return send(res, readResponse('t-אנא אמרו בקול ברור מה תרצו לחפש במכלול', recordSpec));
     }
@@ -89,13 +122,17 @@ async function handler(req, res) {
     if (!choice) {
       if (!yemotApiKey) return send(res, errorMessage('חסר טוקן API KEY של ימות המשיח בהגדרות השלוחה'));
 
+      logStep('stage_search_start', { requestId });
       const wav = await downloadRecording(recording, yemotApiKey);
+      logStep('recording_downloaded', { requestId, bytes: wav.length, wavHeader: wav.subarray(0, 12).toString('hex') });
       const query = await transcribe(wav, req);
+      logStep('transcription_complete', { requestId, textLength: query.length, hasText: Boolean(query), transcript: query.slice(0, 200) });
       if (!query) {
         return send(res, readResponse('t-לא הצלחתי להבין את ההקלטה, אנא נסו שוב', `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`));
       }
 
       const results = await searchMichlol(query, RESULT_COUNT);
+      logStep('search_complete', { requestId, resultCount: results.length, titles: results.map((item) => item.title) });
       if (!results.length) {
         return send(res, textMessageResponse(`לא נמצאו תוצאות לחיפוש ${query}. אנא נסו חיפוש אחר`, TTS_CHUNK_SIZE));
       }
@@ -113,6 +150,7 @@ async function handler(req, res) {
 
     // Step C: selection exists. Because this module is intentionally stateless, repeat the
     // search from the already-collected recording and use the selected numeric index.
+    logStep('stage_article_start', { requestId, choice });
     const selectedIndex = Number(choice);
     if (!Number.isInteger(selectedIndex) || selectedIndex < 1 || selectedIndex > RESULT_COUNT) {
       return send(res, readResponse('t-בחירה לא חוקית, אנא הקישו מספר בין אחת לחמש', `${CHOICE_PARAM},,,1,1,7,NO`));
@@ -120,22 +158,29 @@ async function handler(req, res) {
 
     if (!yemotApiKey) return send(res, errorMessage('חסר טוקן API KEY של ימות המשיח בהגדרות השלוחה'));
     const wav = await downloadRecording(recording, yemotApiKey);
-    const query = await transcribe(wav);
+    logStep('recording_downloaded', { requestId, bytes: wav.length, wavHeader: wav.subarray(0, 12).toString('hex') });
+    const query = await transcribe(wav, req);
+    logStep('transcription_complete', { requestId, textLength: query.length, hasText: Boolean(query), transcript: query.slice(0, 200) });
     if (!query) return send(res, textMessageResponse('לא הצלחתי להבין את ההקלטה, אנא בצעו את החיפוש מחדש', TTS_CHUNK_SIZE));
 
     const results = await searchMichlol(query, RESULT_COUNT);
+    logStep('search_complete', { requestId, resultCount: results.length, titles: results.map((item) => item.title) });
     const selected = results[selectedIndex - 1];
     if (!selected) return send(res, textMessageResponse('התוצאה שבחרתם כבר אינה זמינה, אנא בצעו את החיפוש מחדש', TTS_CHUNK_SIZE));
 
+    logStep('article_selected', { requestId, selectedIndex, title: selected.title });
     const article = await getMichlolExtract(selected.title);
+    logStep('article_loaded', { requestId, found: Boolean(article), extractLength: article?.extract?.length || 0 });
     if (!article || !article.extract) {
       return send(res, textMessageResponse(`לא נמצאה תמצית זמינה עבור ${selected.title}`, TTS_CHUNK_SIZE));
     }
 
     return send(res, textMessageResponse(`${article.title}. ${article.extract}`, TTS_CHUNK_SIZE));
   } catch (error) {
-    console.error('[hamichlol-ivr]', error?.message || error);
+    logStep('request_failed', { requestId, durationMs: Date.now() - startedAt, error: safeError(error) });
     return send(res, errorMessage('נא לנסות שוב מאוחר יותר'));
+  } finally {
+    logStep('request_finished', { requestId, durationMs: Date.now() - startedAt });
   }
 }
 
