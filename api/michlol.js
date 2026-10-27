@@ -1,6 +1,6 @@
 const { searchMichlol, getMichlolExtract } = require('../lib/michlolApi');
 const { downloadRecording } = require('../lib/yemotFiles');
-const { readResponse, idListMessageResponse, textMessageResponse } = require('../lib/yemotResponse');
+const { readResponse, textMessageResponse } = require('../lib/yemotResponse');
 
 const RECORDING_PARAM = process.env.RECORDING_PARAM || 'SearchRecording';
 const CHOICE_PARAM = process.env.CHOICE_PARAM || 'MichlolChoice';
@@ -99,13 +99,13 @@ async function handler(req, res) {
 
       const items = [`t-נמצאו ${results.length} תוצאות`];
       results.forEach((result, index) => items.push(`t-לתוצאה ${index + 1} ${result.title}`));
-      const choiceSpec = `${CHOICE_PARAM},,,1,1,7,NO`;
       items.push('t-אנא הקישו את מספר התוצאה הרצויה');
+      const choiceSpec = `${CHOICE_PARAM},,,1,1,7,NO`;
 
-      // No database/state store is used. On the next request Yemot sends the previously
-      // collected parameters again, including SearchRecording and the new MichlolChoice.
-      // The endpoint therefore repeats transcription + search in step C and selects by index.
-      return send(res, `${idListMessageResponse(items)}&read=t-אנא הקישו את מספר התוצאה הרצויה=${choiceSpec}`);
+      // Yemot read has one action per response. Its prompt supports a dot-separated
+      // sequence of playback items, so announce the results and collect the choice together.
+      // No database/state store is used; step C repeats transcription + search.
+      return send(res, readResponse(items.join('.'), choiceSpec));
     }
 
     // Step C: selection exists. Because this module is intentionally stateless, repeat the
