@@ -16,27 +16,22 @@
  *   (ג) קיים גם פרמטר הבחירה (ChosenItem) -> שליפת תמצית הערך הנבחר
  *                                             והקראתו חזרה (מפוצל לקטעים)
  *
- * שם תיקיית/קובץ ההקלטה שימות שומר אליה מוגדר כאן כקבועים, ומתואמים
- * עם ext.ini.example - אם משנים אחד, יש לשנות גם את השני.
+ * ימות שומרת הקלטות API באופן אוטומטי בתיקיית Trash/ApiRecord.
  */
 
 'use strict';
 
 const { searchMichlol, getExtract } = require('../lib/michlolApi');
-const { buildRecordingPath, downloadRecording } = require('../lib/yemotFiles');
+const { findLatestRecording, downloadRecording } = require('../lib/yemotFiles');
 const {
   buildReadResponse,
   buildFinalMessage,
   buildErrorMessage,
 } = require('../lib/yemotResponse');
 
-// --- קבועים משותפים עם ext.ini.example - אם משנים כאן, לשנות גם שם ---
-const RECORDING_FOLDER = '/1/2'; // התיקייה שאליה ההקלטה נשמרת בימות
-const RECORDING_FILE_NAME = 'mi_search'; // שם הקובץ (בלי סיומת)
 const RECORDING_PARAM_NAME = 'RecFile'; // שם הפרמטר שימות שולח לאחר ההקלטה
 const CHOICE_PARAM_NAME = 'ChosenItem'; // שם הפרמטר שימות שולח לאחר הקשת הבחירה
 const MAX_RESULTS = 5;
-// --- סוף קבועים משותפים ---
 
 // כתובת שירות התמלול (ה-Python microservice הקיים, transcribe.py) -
 // נדרש כמשתנה סביבה; אין ברירת מחדל מוטמעת בקוד.
@@ -90,8 +85,8 @@ function buildStageOneResponse() {
     RECORDING_PARAM_NAME, // שם הפרמטר
     'no', // לא להשתמש בערך קיים - תמיד להקליט מחדש
     'record', // סוג קלט: הקלטה לשמירה (לא voice - התמלול נעשה בשירות שלנו)
-    RECORDING_FOLDER, // תיקיית שמירה
-    RECORDING_FILE_NAME, // שם קובץ
+    '/1/2', // תיקיית הקלטה זמנית שמוגדרת בפרמטר read; ימות מעבירה את הקובץ ל-ApiRecord
+    'mi_search', // שם הקלטה זמני; שם הקובץ הסופי ב-ApiRecord אוטומטי
     'no', // בלי תפריט אישור אחרי ההקלטה - אישור מידי ב-#
     'yes', // לשמור גם אם המתקשר מנתק באמצע ההקלטה
     '', // (ערך שמיני - שם קובץ תוספתי, לא בשימוש כאן)
@@ -109,8 +104,13 @@ function buildStageOneResponse() {
 async function buildStageTwoResponse(params, req, advancedToken) {
   if (!advancedToken) throw new Error('חסר טוקן API מתקדם. הגדירו YemotAdvancedToken בהגדרות השלוחה');
 
-  // מורידים את קובץ ההקלטה מימות
-  const recordingPath = buildRecordingPath(RECORDING_FOLDER, RECORDING_FILE_NAME);
+  // ימות שומרת את ההקלטה בפועל תחת ivr2:Trash/ApiRecord בשם אוטומטי.
+  // מאתרים את הקובץ לפי מספר המתקשר וזמן הקריאה, ולא לפי שם קבוע כמו mi_search.wav.
+  const recordingPath = await findLatestRecording({
+    advancedToken,
+    phone: params.ApiPhone,
+    apiTime: params.ApiTime,
+  });
   const wavBytes = await downloadRecording(recordingPath, advancedToken);
 
   // שולחים לתמלול לשירות הקיים (transcribe.py)
@@ -124,8 +124,8 @@ async function buildStageTwoResponse(params, req, advancedToken) {
       RECORDING_PARAM_NAME,
       'no',
       'record',
-      RECORDING_FOLDER,
-      RECORDING_FILE_NAME,
+      '/1/2',
+      'mi_search',
       'no',
       'yes',
       '',
