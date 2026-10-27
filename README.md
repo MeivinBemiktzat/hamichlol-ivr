@@ -11,6 +11,8 @@
 ## קבצים
 
 - `api/michlol.js` — endpoint של Vercel וה-state machine.
+- `api/transcribe.py` — endpoint תמלול בעברית באותו פרויקט Vercel.
+- `requirements.txt` — ספריות Python הדרושות לתמלול.
 - `lib/michlolApi.js` — חיפוש ושליפת תמצית דרך MediaWiki API.
 - `lib/yemotResponse.js` — בניית תגובות `read` ו-`id_list_message` ופיצול TTS.
 - `lib/yemotFiles.js` — הורדת הקלטת WAV מ-DownloadFile.
@@ -23,13 +25,13 @@
 
 `TRANSCRIBE_URL`
 
-כתובת ה-endpoint הקיים שלך ב-Python שמקבל POST של בייטי WAV ומחזיר JSON בצורה:
+כתובת ה-endpoint של התמלול. אם לא מגדירים משתנה זה, המודול משתמש אוטומטית ב-`/api/transcribe` באותו פרויקט Vercel. יש להגדיר משתנה זה רק אם רוצים לדרוס את ברירת המחדל. ה-endpoint מקבל POST של בייטי WAV ומחזיר JSON בצורה:
 
 ```json
 {"text":"הטקסט שתומלל"}
 ```
 
-המודול אינו כולל מנוע תמלול חדש. הוא משתמש בשירות הקיים. הקוד שהועלה לפרויקט המקורי משתמש ב-`recognize_google()` בעברית `he-IL`, ומוסיף 500ms שקט לפני ואחרי האודיו. fileciteturn4file1
+קובץ התמלול `api/transcribe.py` כלול כעת באותו ריפו ונפרס לצד Node.js באותו פרויקט Vercel. הוא מבוסס על הקובץ שסיפקת, משתמש ב-`recognize_google()` בעברית `he-IL`, ומוסיף 500ms שקט לפני ואחרי האודיו. זהו שירות Google Web Speech לא רשמי דרך SpeechRecognition, ולכן אין הבטחת זמינות מצד Google.
 
 `RECORDINGS_FOLDER` (אופציונלי)
 
