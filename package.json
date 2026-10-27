@@ -1,8 +1,0 @@
-{
-  "name": "hamichlol-ivr",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Voice search and TTS reader for Hamichlol through Yemot Hamashiach API extension",
-  "main": "api/michlol.js",
-  "engines": { "node": ">=18" }
-}
