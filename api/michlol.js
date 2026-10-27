@@ -5,7 +5,7 @@ const { readResponse, textMessageResponse } = require('../lib/yemotResponse');
 const RECORDING_PARAM = process.env.RECORDING_PARAM || 'SearchRecording';
 const CHOICE_PARAM = process.env.CHOICE_PARAM || 'MichlolChoice';
 const TOKEN_PARAM = process.env.TOKEN_PARAM || 'YemotApiKey';
-const TRANSCRIBE_URL = process.env.TRANSCRIBE_URL;
+const TRANSCRIBE_URL = process.env.TRANSCRIBE_URL || null;
 const RESULT_COUNT = Math.min(5, Math.max(1, Number(process.env.RESULT_COUNT || 5)));
 const TTS_CHUNK_SIZE = Number(process.env.TTS_CHUNK_SIZE || 600);
 const TIMEOUT_MS = Number(process.env.TRANSCRIBE_TIMEOUT_MS || 15000);
@@ -36,13 +36,16 @@ async function parseBody(req) {
   return {};
 }
 
-async function transcribe(wavBytes) {
-  if (!TRANSCRIBE_URL) throw new Error('חסר משתנה הסביבה TRANSCRIBE_URL');
+async function transcribe(wavBytes, req) {
+  // ברירת מחדל: endpoint התמלול המקומי באותו פרויקט Vercel. אפשר לדרוס ב-TRANSCRIBE_URL.
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const endpoint = TRANSCRIBE_URL || `${protocol}://${host}/api/transcribe`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(TRANSCRIBE_URL, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'audio/wav', 'User-Agent': 'hamichlol-ivr/1.0' },
       body: wavBytes,
@@ -87,7 +90,7 @@ async function handler(req, res) {
       if (!yemotApiKey) return send(res, errorMessage('חסר טוקן API KEY של ימות המשיח בהגדרות השלוחה'));
 
       const wav = await downloadRecording(recording, yemotApiKey);
-      const query = await transcribe(wav);
+      const query = await transcribe(wav, req);
       if (!query) {
         return send(res, readResponse('t-לא הצלחתי להבין את ההקלטה, אנא נסו שוב', `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`));
       }
