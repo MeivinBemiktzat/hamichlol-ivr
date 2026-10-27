@@ -40,7 +40,7 @@ const MAX_RESULTS = 5;
 
 // כתובת שירות התמלול (ה-Python microservice הקיים, transcribe.py) -
 // נדרש כמשתנה סביבה; אין ברירת מחדל מוטמעת בקוד.
-const TRANSCRIBE_SERVICE_URL = process.env.TRANSCRIBE_SERVICE_URL;
+const TOKEN_PARAM_NAME = 'YemotAdvancedToken'; // מוגדר בהגדרות השלוחה
 
 module.exports = async (req, res) => {
   // ימות שולח את הבקשה כ-GET (עם query params) או כ-POST, תלוי בהגדרת
@@ -48,6 +48,8 @@ module.exports = async (req, res) => {
   const params = { ...(req.query || {}), ...(req.body || {}) };
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+
+  const advancedToken = params[TOKEN_PARAM_NAME] || params.YemotApiKey || params.yemotAdvancedToken;
 
   try {
     if (!params[CHOICE_PARAM_NAME] && !params[RECORDING_PARAM_NAME]) {
@@ -57,12 +59,12 @@ module.exports = async (req, res) => {
 
     if (params[RECORDING_PARAM_NAME] && !params[CHOICE_PARAM_NAME]) {
       // --- שלב ב: יש הקלטה - תמלול, חיפוש, בקשת בחירה ---
-      const response = await buildStageTwoResponse(params);
+      const response = await buildStageTwoResponse(params, req, advancedToken);
       return res.status(200).send(response);
     }
 
     // --- שלב ג: יש גם בחירה - הקראת התמצית ---
-    const response = await buildStageThreeResponse(params);
+    const response = await buildStageThreeResponse(params, advancedToken);
     return res.status(200).send(response);
   } catch (err) {
     // לעולם לא מחזירים stack trace או HTML למתקשר - רק הודעה מוקראת
@@ -104,17 +106,15 @@ function buildStageOneResponse() {
  * שלב ב: מוריד את ההקלטה, שולח לתמלול, מחפש במכלול, ומבקש מהמתקשר
  * לבחור תוצאה בהקשת ספרה.
  */
-async function buildStageTwoResponse(params) {
-  if (!TRANSCRIBE_SERVICE_URL) {
-    throw new Error('משתנה הסביבה TRANSCRIBE_SERVICE_URL לא מוגדר');
-  }
+async function buildStageTwoResponse(params, req, advancedToken) {
+  if (!advancedToken) throw new Error('חסר טוקן API מתקדם. הגדירו YemotAdvancedToken בהגדרות השלוחה');
 
   // מורידים את קובץ ההקלטה מימות
   const recordingPath = buildRecordingPath(RECORDING_FOLDER, RECORDING_FILE_NAME);
-  const wavBytes = await downloadRecording(recordingPath);
+  const wavBytes = await downloadRecording(recordingPath, advancedToken);
 
   // שולחים לתמלול לשירות הקיים (transcribe.py)
-  const transcribedText = await transcribeRecording(wavBytes);
+  const transcribedText = await transcribeRecording(wavBytes, req);
 
   if (!transcribedText) {
     // לא זוהה דיבור - חוזרים לשלב א' (מבקשים הקלטה מחדש) עם הודעה מתאימה.
@@ -187,7 +187,8 @@ async function buildStageTwoResponse(params) {
  * ששמור בפרמטר TranscribedQuery, ובוחרים מתוכו את הפריט לפי המספר
  * שהוקש. זה כרוך בקריאת API נוספת למכלול, אך נמנע מהצורך ב-DB.
  */
-async function buildStageThreeResponse(params) {
+async function buildStageThreeResponse(params, advancedToken) {
+  if (!advancedToken) throw new Error('חסר טוקן API מתקדם. הגדירו YemotAdvancedToken בהגדרות השלוחה');
   const transcribedText = params.TranscribedQuery
     ? decodeURIComponent(params.TranscribedQuery)
     : '';
@@ -220,10 +221,13 @@ async function buildStageThreeResponse(params) {
 /**
  * שולח את בייטי ה-wav לשירות התמלול הקיים (transcribe.py) ומחזיר טקסט.
  */
-async function transcribeRecording(wavBytes) {
+async function transcribeRecording(wavBytes, req) {
   const fetch = require('node-fetch');
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const endpoint = `${protocol}://${host}/api/transcribe`;
 
-  const res = await fetch(TRANSCRIBE_SERVICE_URL, {
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'audio/wav' },
     body: wavBytes,
