@@ -37,11 +37,9 @@ async function parseBody(req) {
 }
 
 async function transcribe(wavBytes, req) {
-  // ברירת מחדל: endpoint התמלול המקומי באותו פרויקט Vercel. אפשר לדרוס ב-TRANSCRIBE_URL.
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const endpoint = TRANSCRIBE_URL || `${protocol}://${host}/api/transcribe`;
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -52,12 +50,18 @@ async function transcribe(wavBytes, req) {
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `שירות התמלול החזיר HTTP ${response.status}`);
+    if (!response.ok) {
+      const error = new Error(data.error || `שירות התמלול החזיר HTTP ${response.status}`);
+      error.code = data.code || `TRANSCRIBE_HTTP_${response.status}`;
+      error.status = response.status;
+      throw error;
+    }
     return String(data.text || '').trim();
   } finally {
     clearTimeout(timer);
   }
 }
+
 
 function logStep(event, details = {}) {
   console.log(JSON.stringify({ scope: 'hamichlol-ivr', event, at: new Date().toISOString(), ...details }));
@@ -128,7 +132,7 @@ async function handler(req, res) {
       const query = await transcribe(wav, req);
       logStep('transcription_complete', { requestId, textLength: query.length, hasText: Boolean(query), transcript: query.slice(0, 200) });
       if (!query) {
-        return send(res, readResponse('t-לא הצלחתי להבין את ההקלטה, אנא נסו שוב', `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`));
+        return send(res, readResponse('t-לא זוהה טקסט בהקלטה. אנא אמרו את מילות החיפוש לאחר הצפצוף', `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`));
       }
 
       const results = await searchMichlol(query, RESULT_COUNT);
@@ -161,7 +165,7 @@ async function handler(req, res) {
     logStep('recording_downloaded', { requestId, bytes: wav.length, wavHeader: wav.subarray(0, 12).toString('hex') });
     const query = await transcribe(wav, req);
     logStep('transcription_complete', { requestId, textLength: query.length, hasText: Boolean(query), transcript: query.slice(0, 200) });
-    if (!query) return send(res, textMessageResponse('לא הצלחתי להבין את ההקלטה, אנא בצעו את החיפוש מחדש', TTS_CHUNK_SIZE));
+    if (!query) return send(res, textMessageResponse('לא זוהה טקסט בהקלטה. אנא בצעו את החיפוש מחדש', TTS_CHUNK_SIZE));
 
     const results = await searchMichlol(query, RESULT_COUNT);
     logStep('search_complete', { requestId, resultCount: results.length, titles: results.map((item) => item.title) });
@@ -178,7 +182,22 @@ async function handler(req, res) {
     return send(res, textMessageResponse(`${article.title}. ${article.extract}`, TTS_CHUNK_SIZE));
   } catch (error) {
     logStep('request_failed', { requestId, durationMs: Date.now() - startedAt, error: safeError(error) });
-    return send(res, errorMessage('נא לנסות שוב מאוחר יותר'));
+    if (error?.code === 'SHORT_AUDIO') {
+      return send(res, readResponse('t-נראה שההקלטה קצרה מדי. אנא המתינו לצפצוף ואמרו את מילות החיפוש', `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`));
+    }
+    if (error?.code === 'NO_SPEECH') {
+      return send(res, readResponse('t-לא זוהה דיבור בהקלטה. אנא אמרו בקול ברור את מילות החיפוש', `${RECORDING_PARAM},,record,${process.env.RECORDINGS_FOLDER || '/api_search'},,no,yes,1,30`));
+    }
+    if (error?.code === 'GOOGLE_UNAVAILABLE') {
+      return send(res, errorMessage('שירות התמלול אינו זמין כרגע. אנא נסו שוב מאוחר יותר'));
+    }
+    if (String(error?.code || '').startsWith('TRANSCRIBE_HTTP_')) {
+      return send(res, errorMessage('שירות התמלול החזיר שגיאה. אנא נסו שוב מאוחר יותר'));
+    }
+    if (String(error?.message || '').includes('HTTP 403') && String(error?.message || '').includes('המכלול')) {
+      return send(res, errorMessage('שירות החיפוש במכלול חסם את הבקשה כרגע. אנא נסו שוב מאוחר יותר'));
+    }
+    return send(res, errorMessage('אירעה תקלה לא צפויה. אנא נסו שוב מאוחר יותר'));
   } finally {
     logStep('request_finished', { requestId, durationMs: Date.now() - startedAt });
   }
