@@ -1,0 +1,30 @@
+# סודות - לעולם לא לגיטהאב
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Vercel
+.vercel
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm
+
+# Python (לפונקציית התמלול)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# מערכת הפעלה
+.DS_Store
+Thumbs.db
+
+# עורכים
+.idea/
+.vscode/
+*.swp
