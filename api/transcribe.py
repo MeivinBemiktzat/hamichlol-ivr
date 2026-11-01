@@ -34,7 +34,9 @@
 
 תלויות
 ------
-נדרש requirements.txt עם SpeechRecognition ו-pydub.
+נדרש SpeechRecognition ו-pydub. התלויות שמותקנות בפועל בפריסת Vercel
+מוגדרות ב-pyproject.toml שבשורש (לא ב-requirements.txt — זה האחרון
+משמש רק לפיתוח מקומי ומתעלמים ממנו כש-pyproject.toml קיים).
 שימו לb: pydub דורש ffmpeg לפורמטים מסוימים. עבור wav רגיל הוא מסתדר
 בלעדיו, ולכן הקוד כאן עובד עם wav בלבד.
 """

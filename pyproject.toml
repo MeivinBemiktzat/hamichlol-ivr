@@ -1,0 +1,17 @@
+# ⚠️ קובץ זה הוא היעד היחיד שבו Vercel מחפש תלויות פייתון לפריסה.
+# ברגע שיש pyproject.toml בנתיב החיפוש (תיקיית נקודת הכניסה ומעלה), הבילדר
+# של Vercel מתעלם לגמרי מ-requirements.txt, גם אם הוא קיים בשורש הפרויקט.
+# requirements.txt עדיין נשמר בנפרד לצורך pip install מקומי בלבד (ראו שם),
+# אבל כל שינוי בתלויות של api/transcribe.py חייב להתעדכן גם כאן, אחרת
+# הפונקציה תיפול בזמן ריצה עם "No module named ...".
+[project]
+name = "hamichlol-ivr-transcribe"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "SpeechRecognition==3.10.4",
+    "pydub==0.25.1",
+]
+
+[tool.vercel]
+entrypoint = "api.transcribe:handler"

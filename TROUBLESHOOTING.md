@@ -67,7 +67,8 @@
 |---------|----------------|-------------|---------|
 | הפריסה נכשלת | Build Command מיותר | בלוג הפריסה | לרוקן את Build ו-Install. אין שלב בנייה בפרויקט |
 | 404 על `/api/yemot` | נתיב שגוי ב-`api_link` | לפתוח את הכתובת בדפדפן | לוודא שהנתיב הוא `/api/yemot` בדיוק |
-| 404 על `/api/transcribe` | `requirements.txt` חסר | לבדוק שהקובץ בשורש | להוסיף ולפרוס מחדש. רלוונטי רק בתמלול חיצוני |
+| 404 על `/api/transcribe` | `pyproject.toml` חסר, או שאין בו `[tool.vercel] entrypoint` | לבדוק שהקובץ קיים בשורש | להחזיר את `pyproject.toml` ולפרוס מחדש. רלוונטי רק בתמלול חיצוני |
+| `TRANSCRIPTION_ERROR` עם `No module named 'speech_recognition'` | התלויות לא מותקנות בפריסה | לבדוק שהחבילות מופיעות תחת `[project] dependencies` ב-`pyproject.toml` | **לא מספיק** לעדכן את `requirements.txt` בלבד: כש-`pyproject.toml` קיים בשורש, הבילדר של Vercel משתמש בו *במקום* `requirements.txt` לגמרי. יש לעדכן את שני הקבצים יחד ולפרוס מחדש. רלוונטי רק בתמלול חיצוני |
 | `FUNCTION_INVOCATION_TIMEOUT` | מקור חיצוני תקוע | בלוג, זמן התגובה | להוריד `HTTP_TIMEOUT_MS` ל-5000, כדי לכשול מהר ולהחזיר הודעה |
 | `FUNCTION_PAYLOAD_TOO_LARGE` | גוף בקשה מעל 4.5MB | — | לא אמור לקרות עם ימות. בתמלול חיצוני, לקצר את ההקלטה |
 
