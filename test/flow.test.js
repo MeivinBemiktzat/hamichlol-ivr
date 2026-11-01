@@ -80,6 +80,18 @@ describe('זרימת שיחה מלאה', () => {
     assert.match(listenVar, /^s_\d+_listen_r0_0$/, `מצב האזנה שגוי: ${listenVar}`);
   });
 
+  test('VOICE_SEARCH_ENABLED=no כופה הקשה במקלדת גם כשהעדפת המשתמש היא קולי', async () => {
+    const original = config.search.voiceModeEnabled;
+    config.search.voiceModeEnabled = false;
+    try {
+      const s2 = await step({ s_0_main: '1' });
+      assert.ok(!s2.body.includes('voice'), 'חיפוש קולי לא אמור להיות זמין כשהוא מושבת');
+      assert.ok(s2.body.includes('HebrewKeyboard'), 'ציפיתי לקלט מקלדת כחלופה');
+    } finally {
+      config.search.voiceModeEnabled = original;
+    }
+  });
+
   test('אין לולאה אינסופית אחרי קליטת שאילתה', async () => {
     // זה היה באג אמיתי: המערכת חזרה לבקש את השאילתה שוב ושוב
     const s = await step({ s_0_main: '1', q_1: 'תלמוד' });
