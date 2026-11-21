@@ -55,29 +55,45 @@ describe('זרימת שיחה מלאה', () => {
     assert.ok(!body.trim().startsWith('<'), 'התשובה נראית כמו HTML');
   });
 
-  test('מסלול מלא: תפריט, חיפוש, תוצאות, האזנה', async () => {
-    // צעד 1: תפריט ראשי, המתקשר מקיש 1
-    const s1 = await step({}, null);
-    assert.equal(s1.parsed.readVariable(), 's_0_main');
+  test('מסלול מלא: תפריט, חיפוש בהקשה, תוצאות, האזנה', async () => {
+    const original = config.search.voiceModeEnabled;
+    config.search.voiceModeEnabled = false;
+    try {
+      const s1 = await step({}, null);
+      assert.equal(s1.parsed.readVariable(), 's_0_main');
 
-    // צעד 2: נקלטה הקשה 1, המערכת מבקשת שאילתה
-    const s2 = await step({ s_0_main: '1' });
-    const queryVar = s2.parsed.readVariable();
-    assert.match(queryVar, /^q_\d+$/, `ציפיתי לפרמטר שאילתה, קיבלתי ${queryVar}`);
-    assert.ok(s2.body.includes('voice'), 'חיפוש קולי הוא ברירת המחדל');
+      const s2 = await step({ s_0_main: '1' });
+      const queryVar = s2.parsed.readVariable();
+      assert.match(queryVar, /^q_\d+$/, `ציפיתי לפרמטר שאילתה, קיבלתי ${queryVar}`);
+      assert.ok(s2.body.includes('HebrewKeyboard'));
 
-    // צעד 3: המתקשר אמר "תלמוד", המערכת מציגה תוצאות
-    const s3 = await step({ s_0_main: '1', [queryVar]: 'תלמוד' });
-    assert.ok(s3.body.includes('נמצאו'), 'לא הוצגו תוצאות');
-    assert.ok(s3.body.includes('תלמוד בבלי'));
-    const resultsVar = s3.parsed.readVariable();
-    assert.match(resultsVar, /^s_\d+_results$/);
+      const s3 = await step({ s_0_main: '1', [queryVar]: 'תלמוד' });
+      assert.ok(s3.body.includes('נמצאו'), 'לא הוצגו תוצאות');
+      assert.ok(s3.body.includes('תלמוד בבלי'));
+      const resultsVar = s3.parsed.readVariable();
+      assert.match(resultsVar, /^s_\d+_results$/);
 
-    // צעד 4: המתקשר בוחר תוצאה 1 ומתחיל להאזין
-    const s4 = await step({ s_0_main: '1', [queryVar]: 'תלמוד', [resultsVar]: '1' });
-    assert.ok(s4.body.includes('מקטע'), 'לא התחילה הקראה');
-    const listenVar = s4.parsed.readVariable();
-    assert.match(listenVar, /^s_\d+_listen_r0_0$/, `מצב האזנה שגוי: ${listenVar}`);
+      const s4 = await step({ s_0_main: '1', [queryVar]: 'תלמוד', [resultsVar]: '1' });
+      assert.ok(s4.body.includes('מקטע'), 'לא התחילה הקראה');
+      const listenVar = s4.parsed.readVariable();
+      assert.match(listenVar, /^s_\d+_listen_r0_0$/, `מצב האזנה שגוי: ${listenVar}`);
+    } finally {
+      config.search.voiceModeEnabled = original;
+    }
+  });
+
+  test('חיפוש קולי משתמש בהקלטה ולא בזיהוי הדיבור של ימות', async () => {
+    const original = config.search.voiceModeEnabled;
+    config.search.voiceModeEnabled = true;
+    try {
+      const result = await step({ s_0_main: '1' });
+      assert.match(result.parsed.readVariable(), /^s_\d+_searchinput$/);
+      assert.ok(result.body.includes(',record,'), 'הקלטה צריכה להיות מסוג record');
+      assert.ok(!result.body.includes(',voice,'), 'אסור להפעיל תמלול מובנה של ימות');
+      assert.ok(result.body.includes('/trash/ApiRecord'));
+    } finally {
+      config.search.voiceModeEnabled = original;
+    }
   });
 
   test('VOICE_SEARCH_ENABLED=no כופה הקשה במקלדת גם כשהעדפת המשתמש היא קולי', async () => {
