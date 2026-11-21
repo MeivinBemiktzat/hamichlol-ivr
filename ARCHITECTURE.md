@@ -67,7 +67,7 @@ lib/
     huggingface.js      מאגר datasets דרך HTTP
     memory.js           זיכרון, לבדיקות והרצה מקומית
 
-test/                   107 בדיקות, בלי גישה לרשת
+test/                   בדיקות אוטומטיות, בלי גישה לרשת
 scripts/smoke.js        בדיקת עשן מול פריסה חיה
 ```
 
