@@ -64,6 +64,18 @@ describe('בניית תשובות לימות', () => {
     assert.ok(!result.endsWith(','), 'אסור שהתשובה תסתיים בפסיק מיותר');
   });
 
+  test('readRecord מקליט לקובץ בלי להפעיל זיהוי דיבור', () => {
+    const result = Y.readRecord({
+      segments: [Y.text('אמרו את שם הערך')],
+      variableName: 's_1_searchinput',
+      fileName: 'voice_call123_1',
+      maxSeconds: 10,
+    });
+
+    assert.ok(result.includes('s_1_searchinput,no,record,/trash/ApiRecord,voice_call123_1'));
+    assert.ok(!result.includes(',voice,'));
+  });
+
   test('readVoice מבקש זיהוי דיבור בשפה הנכונה', () => {
     const result = Y.readVoice({
       segments: [Y.text('אמרו את שם הערך')],
